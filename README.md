@@ -9,6 +9,10 @@ An experiment in building an in-game win probability model for tennis matches.
 
 ![Venus v Sabrina](out/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png)
 
+## Accuracy
+
+![Accuracy](out/accuracy.png)
+
 ## Reference
 
 Data is from the [Match Charting Project](https://github.com/JeffSackmann/tennis_MatchChartingProject).
