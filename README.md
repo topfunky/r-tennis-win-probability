@@ -1,6 +1,17 @@
-# [WIP] Tennis In-Game Win Probability with R
+# Tennis In-Game Win Probability with R
 
 An experiment in building an in-game win probability model for tennis matches.
+
+## Sample match
+
+- 20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske
+- http://www.tennisabstract.com/charting/20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske.html
+
+![Sabalenka v Riske](out/20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske.png)
+
+## Reference
+
+Data is from the [Match Charting Project](https://github.com/JeffSackmann/tennis_MatchChartingProject).
 
 ## Development notes
 
@@ -8,9 +19,11 @@ Data cleanup tasks to do:
 
 - Split `match_id` on `-` to get year, player 1, player 2, etc.
 - Need to mutate initials of each player and store in fields for player 1 and player 2 so `Serving` is meaningful (`IS` for `Iga_Swiatek`)
-- Match doesn't have a final frame but ends with `PtWinner` after last record for each match
-- Winner of the final point is the winner of the match (player `1` or `2` in `PtWinner`)
-- Records are numbered by point (approximately 100 per match)
+- Records are numbered by point `Pts` (approximately 100 per match)
 - `Set1` and `Set2` are sets won by player 1 or two
 - Same for `Gm1` and `Gm2`
 - `Pts` needs to be split on `-` to find points for each player
+- Probably needs a final frame for the end of the game when one player has 100% win probability
+- Could extend the model for points (currently uses games and sets)
+- Need to add reference lines for games or sets.
+
