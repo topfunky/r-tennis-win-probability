@@ -4,10 +4,10 @@ An experiment in building an in-game win probability model for tennis matches.
 
 ## Sample match
 
-- 20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske
-- http://www.tennisabstract.com/charting/20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske.html
+- 20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png
+- http://www.tennisabstract.com/charting/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.html
 
-![Sabalenka v Riske](out/20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske.png)
+![Venus v Sabrina](out/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png)
 
 ## Reference
 
@@ -26,4 +26,3 @@ Data cleanup tasks to do:
 - Probably needs a final frame for the end of the game when one player has 100% win probability
 - Could extend the model for points (currently uses games and sets)
 - Need to add reference lines for games or sets.
-
