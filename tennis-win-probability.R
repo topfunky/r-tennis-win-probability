@@ -7,6 +7,8 @@ library(gghighcontrast)
 library(scales)
 library(ggimage)
 
+DEVELOPMENT_MODE = TRUE
+
 # Don't display numbers in scientific notation
 options(scipen = 9999)
 
@@ -35,7 +37,9 @@ for (directory in directories) {
 # Caches remote file if missing from local filesystem. Returns data frames.
 charting_points <- function(gender) {
   retrieve_csv_and_cache_data_locally(
-    str_interp("https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-${gender}-points.csv")
+    str_interp(
+      "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-${gender}-points.csv"
+    )
   )
 }
 
@@ -60,7 +64,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1, ]
+    this_match <- data[1,]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -76,7 +80,7 @@ plot_for_data <-
         "text",
         x = 5,
         y = 0.95,
-        label = this_match$player1,
+        label = this_match$Player1,
         family = "InputMono",
         color = foreground_color,
         size = 2
@@ -86,7 +90,7 @@ plot_for_data <-
         "text",
         x = 5,
         y = 0.05,
-        label = this_match$player2,
+        label = this_match$Player2,
         family = "InputMono",
         color = foreground_color,
         size = 2
@@ -103,7 +107,7 @@ plot_for_data <-
             axis.ticks.x = element_blank()) +
       labs(
         title = str_interp(
-          "${this_match$player1} vs ${this_match$player2} @ ${this_match$tournament} ${this_match$date}"
+          "${this_match$Player1} vs ${this_match$Player2} @ ${this_match$Tournament} ${this_match$MatchDate}"
         ),
         subtitle = "Custom win probability model for tennis",
         caption = "Data from https://github.com/JeffSackmann/tennis_MatchChartingProject",
@@ -119,9 +123,9 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes,]
+  train <- data[indexes, ]
 
-  win_prediction_model = glm(match_winner_is_player_1 ~
+  win_prediction_model = glm(Player1Wins ~
                                SetDelta + GmDelta + PtCountdown,
                              train,
                              family = "binomial")
@@ -134,7 +138,7 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
+             predict(win_prediction_model, pbp[row_number(),], type = "response"))
   return(pbp)
 }
 
@@ -155,9 +159,10 @@ plot_for_match_id <- function(data, single_match_id, prefix) {
 
 # Either process the data, write a cached version, and return it,
 # or just return the cached version from disk for quicker processing.
-load_and_clean_data <- function(data, label) {
-  local_data_cache_filename <- str_interp("data/${label}.rds")
-  if (!file.exists(local_data_cache_filename)) {
+load_and_clean_data <- function(data, gender) {
+  local_data_cache_filename <- str_interp("data/${gender}.rds")
+  # Don't use cache if in development mode
+  if (!DEVELOPMENT_MODE | !file.exists(local_data_cache_filename)) {
     cleaned_data <- clean_data(data)
     write_rds(cleaned_data, local_data_cache_filename)
     return(cleaned_data)
@@ -177,19 +182,20 @@ clean_data <- function(data) {
       match_id,
       c(
         "date_string",
-        "gender",
-        "tournament",
-        "round",
-        "player1",
-        "player2"
+        "Gender",
+        "Tournament",
+        "MatchRound",
+        "Player1",
+        "Player2"
       ),
       remove = FALSE,
       sep = "-"
     ) %>%
     mutate(
-      date = as.Date(date_string, format = "%Y%m%d"),
-      player1 = str_replace(player1, "_", " "),
-      player2 = str_replace(player2, "_", " ")
+      MatchDate = as.Date(date_string, format = "%Y%m%d"),
+      Player1 = str_replace_all(Player1, "_", " "),
+      Player2 = str_replace_all(Player2, "_", " "),
+      Tournament = str_replace_all(Tournament, "_", " ")
     )
 
   # Get final play to determine match winner
@@ -197,14 +203,16 @@ clean_data <- function(data) {
     pbp %>%
     group_by(match_id) %>%
     filter(Pt == max(Pt)) %>%
-    mutate(match_winner_is_player_1 = ifelse(PtWinner == 1, 1, 0),
-           Pt = Pt + 1,
-           PtTotal = Pt) %>%
+    mutate(
+      Player1Wins = ifelse(PtWinner == 1, 1, 0),
+      Pt = Pt + 1,
+      PtTotal = Pt
+    ) %>%
     ungroup()
 
   # Select only a few fields
   match_winners <- final_play_for_each_match %>%
-    select(match_id, match_winner_is_player_1, PtTotal)
+    select(match_id, Player1Wins, PtTotal)
 
   # Join so all rows include the match winner
   pbp <-
@@ -215,8 +223,8 @@ clean_data <- function(data) {
   # The point by point frames don't include the final score.
   match_result_plays <- final_play_for_each_match %>%
     mutate(
-      Set1 = ifelse(match_winner_is_player_1 == 1, Set1 + 1, Set1),
-      Set2 = ifelse(match_winner_is_player_1 == 0, Set2 + 1, Set2),
+      Set1 = ifelse(Player1Wins == 1, Set1 + 1, Set1),
+      Set2 = ifelse(Player1Wins == 0, Set2 + 1, Set2),
       Gm1 = 0,
       Gm2 = 0,
       Pts = "0-0"
@@ -229,13 +237,13 @@ clean_data <- function(data) {
       Gm1,
       Gm2,
       Pts,
-      match_winner_is_player_1,
-      date,
-      gender,
-      tournament,
-      round,
-      player1,
-      player2,
+      Player1Wins,
+      MatchDate,
+      Gender,
+      Tournament,
+      MatchRound,
+      Player1,
+      Player2,
       PtTotal
     )
 
@@ -252,14 +260,17 @@ clean_data <- function(data) {
 }
 
 plot_accuracy <-
-  function(data, foreground_color, background_color) {
+  function(data,
+           gender,
+           foreground_color,
+           background_color) {
     data <- data %>%
       mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
       group_by(bin_pred_prob) %>%
       # Calculate the calibration results:
       summarize(
         n_plays = n(),
-        n_wins = length(which(match_winner_is_player_1 == 1)),
+        n_wins = length(which(Player1Wins == 1)),
         bin_actual_prob = n_wins / n_plays
       )
 
@@ -295,8 +306,8 @@ plot_accuracy <-
       ) +
       theme(legend.position = "none") +
       labs(
-        title = "Model Accuracy",
-        subtitle = "Custom prediction vs actual win percentage",
+        title = str_interp("Model Accuracy ${gender}"),
+        subtitle = "Model prediction vs actual win percentage",
         caption = "Data from Match Charting Project",
         x = "Predicted",
         y = "Actual"
@@ -314,14 +325,14 @@ run_w <- function() {
   )
 
   pbp <- load_and_clean_data(charting_points("w"), "w") %>%
-    filter(date > as.Date("2008-01-01")) %>%
+    filter(MatchDate > as.Date("2008-01-01")) %>%
     populate_each_row_with_prediction()
 
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id, "w")
   }
 
-  plot <- plot_accuracy(pbp, light_grey, "#222222")
+  plot <- plot_accuracy(pbp, "w", light_grey, "#222222")
   ggsave(
     "out/accuracy-w.png",
     plot = plot,
@@ -340,14 +351,14 @@ run_m <- function() {
   )
 
   pbp <- load_and_clean_data(charting_points("m"), "m") %>%
-    filter(date > as.Date("2008-01-01")) %>%
+    filter(MatchDate > as.Date("2008-01-01")) %>%
     populate_each_row_with_prediction()
 
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id, "m")
   }
 
-  plot <- plot_accuracy(pbp, light_grey, "#222222")
+  plot <- plot_accuracy(pbp, "m", light_grey, "#222222")
   ggsave(
     "out/accuracy-m.png",
     plot = plot,
@@ -358,4 +369,3 @@ run_m <- function() {
 
 run_w()
 run_m()
-
