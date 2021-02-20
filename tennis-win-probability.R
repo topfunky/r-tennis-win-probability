@@ -64,7 +64,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1,]
+    this_match <- data[1, ]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -123,12 +123,14 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes, ]
+  train <- data[indexes,]
 
-  win_prediction_model = glm(Player1Wins ~
-                               SetDelta + GmDelta + Pts1Delta + PtCountdown,
-                             train,
-                             family = "binomial")
+  win_prediction_model = glm(
+    Player1Wins ~
+      SetDelta + GmDelta + Pts1Delta + PtCountdown + Player1IsServing,
+    train,
+    family = "binomial"
+  )
   return(win_prediction_model)
 }
 
@@ -138,7 +140,7 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(),], type = "response"))
+             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
   return(pbp)
 }
 
@@ -220,7 +222,8 @@ clean_data <- function(data) {
       MatchDate = as.Date(date_string, format = "%Y%m%d"),
       Player1 = str_replace_all(Player1, "_", " "),
       Player2 = str_replace_all(Player2, "_", " "),
-      Tournament = str_replace_all(Tournament, "_", " ")
+      Tournament = str_replace_all(Tournament, "_", " "),
+      Player1IsServing = ifelse(Svr == 1, 1, 0)
     )
 
   # Get final play to determine match winner
@@ -273,7 +276,8 @@ clean_data <- function(data) {
       Player2,
       PtTotal,
       Pts1Delta,
-      Pts2Delta
+      Pts2Delta,
+      Player1IsServing
     )
 
   pbp <- bind_rows(pbp, match_result_plays)
