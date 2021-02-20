@@ -126,7 +126,7 @@ build_win_prediction_model <- function(data) {
   train <- data[indexes, ]
 
   win_prediction_model = glm(Player1Wins ~
-                               SetDelta + GmDelta + PtCountdown,
+                               SetDelta + GmDelta + Pts1Delta + PtCountdown,
                              train,
                              family = "binomial")
   return(win_prediction_model)
@@ -172,6 +172,25 @@ load_and_clean_data <- function(data, gender) {
   }
 }
 
+# Turn "0", "15", "30", "40", "AD" to 1, 2, 3, 4, 5
+# so traditional math can be done against the points scored.
+convert_pts_to_integer <- function(v) {
+  case_when(
+    v == "0" ~ 0,
+    v == "15" ~ 1,
+    v == "30" ~ 2,
+    v == "40" ~ 3,
+    v == "AD" ~ 4,
+    # Tiebreak
+    v == "1" ~ 1,
+    v == "2" ~ 2,
+    v == "3" ~ 3,
+    v == "4" ~ 4,
+    v == "5" ~ 5,
+    v == "6" ~ 6,
+  )
+}
+
 clean_data <- function(data) {
   pbp <- data %>%
     # Fix problematic encoding on some rows
@@ -191,7 +210,13 @@ clean_data <- function(data) {
       remove = FALSE,
       sep = "-"
     ) %>%
+    separate(Pts, c("PtsA", "PtsB"), remove = FALSE, sep = "-") %>%
     mutate(
+      PtsA = convert_pts_to_integer(PtsA),
+      PtsB = convert_pts_to_integer(PtsB),
+      # If server is Player1, then PtsA will be the server's score
+      Pts1Delta = ifelse(Svr == 1, (PtsA - PtsB), (PtsB - PtsA)),
+      Pts2Delta = ifelse(Svr == 2, (PtsA - PtsB), (PtsB - PtsA)),
       MatchDate = as.Date(date_string, format = "%Y%m%d"),
       Player1 = str_replace_all(Player1, "_", " "),
       Player2 = str_replace_all(Player2, "_", " "),
@@ -227,7 +252,9 @@ clean_data <- function(data) {
       Set2 = ifelse(Player1Wins == 0, Set2 + 1, Set2),
       Gm1 = 0,
       Gm2 = 0,
-      Pts = "0-0"
+      Pts = "0-0",
+      Pts1Delta = 0,
+      Pts2Delta = 0
     ) %>%
     select(
       match_id,
@@ -244,7 +271,9 @@ clean_data <- function(data) {
       MatchRound,
       Player1,
       Player2,
-      PtTotal
+      PtTotal,
+      Pts1Delta,
+      Pts2Delta
     )
 
   pbp <- bind_rows(pbp, match_result_plays)
