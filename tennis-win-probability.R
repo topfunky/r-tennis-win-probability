@@ -126,11 +126,9 @@ build_win_prediction_model <- function(data) {
                    round(nrow(data) * 0.8),
                    replace = FALSE)
   train <- data[indexes,]
-  train <- train %>%
-    select(match_id, Pt, match_winner_is_player_1, Set1, Set2, Gm1, Gm2)
 
   win_prediction_model = glm(match_winner_is_player_1 ~
-                               Set1 + Set2 + Gm1 + Gm2,
+                               SetDelta + GmDelta + PtCountdown,
                              train,
                              family = "binomial")
   return(win_prediction_model)
@@ -191,12 +189,14 @@ load_and_clean_data <- function() {
     pbp %>%
     group_by(match_id) %>%
     filter(Pt == max(Pt)) %>%
-    mutate(match_winner_is_player_1 = ifelse(PtWinner == 1, 1, 0)) %>%
+    mutate(match_winner_is_player_1 = ifelse(PtWinner == 1, 1, 0),
+           Pt = Pt + 1,
+           PtTotal = Pt) %>%
     ungroup()
 
   # Select only a few fields
   match_winners <- final_play_for_each_match %>%
-    select(match_id, match_winner_is_player_1)
+    select(match_id, match_winner_is_player_1, PtTotal)
 
   # Join so all rows include the match winner
   pbp <-
@@ -207,7 +207,6 @@ load_and_clean_data <- function() {
   # The point by point frames don't include the final score.
   match_result_plays <- final_play_for_each_match %>%
     mutate(
-      Pt = Pt + 1,
       Set1 = ifelse(match_winner_is_player_1 == 1, Set1 + 1, Set1),
       Set2 = ifelse(match_winner_is_player_1 == 0, Set2 + 1, Set2),
       Gm1 = 0,
@@ -228,10 +227,18 @@ load_and_clean_data <- function() {
       tournament,
       round,
       player1,
-      player2
+      player2,
+      PtTotal
     )
 
   pbp <- bind_rows(pbp, match_result_plays)
+
+  # Calculate delta for Sets, Games, Pt (number of plays)
+  pbp <- pbp %>% mutate(
+    SetDelta = Set1 - Set2,
+    GmDelta = Gm1 - Gm2,
+    PtCountdown = PtTotal - Pt
+  )
 
   return(pbp)
 }
@@ -239,7 +246,7 @@ load_and_clean_data <- function() {
 plot_accuracy <-
   function(data, foreground_color, background_color) {
     data <- data %>%
-      mutate(bin_pred_prob = round(win_probability_player_1 / 0.02) * 0.02) %>%
+      mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
       group_by(bin_pred_prob) %>%
       # Calculate the calibration results:
       summarize(
@@ -290,7 +297,7 @@ plot_accuracy <-
   }
 
 
-run <- function() {
+run_w <- function() {
   match_ids <- list(
     "20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske",
     "20190325-W-Miami-R16-Caroline_Wozniacki-Su_Wei_Hsieh",
@@ -308,7 +315,7 @@ run <- function() {
 
   plot <- plot_accuracy(pbp, light_grey, "#222222")
   ggsave(
-    "out/accuracy.png",
+    "out/accuracy_w.png",
     plot = plot,
     width = 6,
     height = 4
@@ -332,4 +339,4 @@ run <- function() {
     )
 }
 
-run()
+run_w()
