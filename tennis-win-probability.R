@@ -66,7 +66,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1,]
+    this_match <- data[1, ]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -125,7 +125,9 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes, ]
+  train <- data[indexes,]
+  train <- train %>%
+    select(match_id, Pt, match_winner_is_player_1, Set1, Set2, Gm1, Gm2)
 
   win_prediction_model = glm(match_winner_is_player_1 ~
                                Set1 + Set2 + Gm1 + Gm2,
@@ -140,7 +142,7 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(),], type = "response"))
+             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
   return(pbp)
 }
 
@@ -189,7 +191,8 @@ load_and_clean_data <- function() {
     pbp %>%
     group_by(match_id) %>%
     filter(Pt == max(Pt)) %>%
-    mutate(match_winner_is_player_1 = ifelse(PtWinner == 1, 1, 0))
+    mutate(match_winner_is_player_1 = ifelse(PtWinner == 1, 1, 0)) %>%
+    ungroup()
 
   # Select only a few fields
   match_winners <- final_play_for_each_match %>%
@@ -229,6 +232,7 @@ load_and_clean_data <- function() {
     )
 
   pbp <- bind_rows(pbp, match_result_plays)
+
   return(pbp)
 }
 
@@ -254,11 +258,10 @@ plot_accuracy <-
       #   "Q4" = "4"
       # )) %>%
       ggplot() +
-      geom_point(aes(
-        x = bin_pred_prob,
-        y = bin_actual_prob,
-        size = n_plays
-      ), color = yellowgreen_neon) +
+      geom_point(aes(x = bin_pred_prob,
+                     y = bin_actual_prob,
+                     size = n_plays),
+                 color = yellowgreen_neon) +
       geom_smooth(aes(x = bin_pred_prob, y = bin_actual_prob),
                   color = foreground_color,
                   method = "loess") +
@@ -304,7 +307,12 @@ run <- function() {
   }
 
   plot <- plot_accuracy(pbp, light_grey, "#222222")
-  ggsave("out/accuracy.png", plot=plot, width=6, height=4)
+  ggsave(
+    "out/accuracy.png",
+    plot = plot,
+    width = 6,
+    height = 4
+  )
 
   # For debugging...create a frame with just this match
   single_match_pbp <-
