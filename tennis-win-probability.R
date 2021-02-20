@@ -23,40 +23,19 @@ rich_black = "#010203"
 yellowgreen_neon = "#8bff00"
 light_grey = "#999999"
 
-if (!dir.exists("data")) {
-  dir.create("data")
-}
-if (!dir.exists("out")) {
-  dir.create("out")
-}
-if (!dir.exists("out/w")) {
-  dir.create("out/w")
-}
-if (!dir.exists("out/m")) {
-  dir.create("out/m")
+directories <- list("data", "out", "out/w", "out/m")
+for (directory in directories) {
+  if (!dir.exists(directory)) {
+    dir.create(directory)
+  }
 }
 
-# Point by point records for women's matches.
+# Point by point records for matches: "w" or "m".
 #
 # Caches remote file if missing from local filesystem. Returns data frames.
-charting_w_points <- function() {
+charting_points <- function(gender) {
   retrieve_csv_and_cache_data_locally(
-    "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-w-points.csv"
-  )
-}
-
-charting_w_matches <- function() {
-  retrieve_csv_and_cache_data_locally(
-    "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-w-matches.csv"
-  )
-}
-
-# Point by point records for men's matches.
-#
-# Caches remote file if missing from local filesystem. Returns data frames.
-charting_m_points <- function() {
-  retrieve_csv_and_cache_data_locally(
-    "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-m-points.csv"
+    str_interp("https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-${gender}-points.csv")
   )
 }
 
@@ -174,7 +153,21 @@ plot_for_match_id <- function(data, single_match_id, prefix) {
   )
 }
 
-load_and_clean_data <- function(data) {
+# Either process the data, write a cached version, and return it,
+# or just return the cached version from disk for quicker processing.
+load_and_clean_data <- function(data, label) {
+  local_data_cache_filename <- str_interp("data/${label}.rds")
+  if (!file.exists(local_data_cache_filename)) {
+    cleaned_data <- clean_data(data)
+    write_rds(cleaned_data, local_data_cache_filename)
+    return(cleaned_data)
+  } else {
+    cleaned_data <- readRDS(local_data_cache_filename)
+    return(cleaned_data)
+  }
+}
+
+clean_data <- function(data) {
   pbp <- data %>%
     # Fix problematic encoding on some rows
     mutate(match_id = iconv(match_id, "ASCII", "UTF-8")) %>%
@@ -320,7 +313,7 @@ run_w <- function() {
     "20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams"
   )
 
-  pbp <- load_and_clean_data(charting_w_points()) %>%
+  pbp <- load_and_clean_data(charting_points("w"), "w") %>%
     filter(date > as.Date("2008-01-01")) %>%
     populate_each_row_with_prediction()
 
@@ -346,7 +339,7 @@ run_m <- function() {
     "20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal"
   )
 
-  pbp <- load_and_clean_data(charting_m_points()) %>%
+  pbp <- load_and_clean_data(charting_points("m"), "m") %>%
     filter(date > as.Date("2008-01-01")) %>%
     populate_each_row_with_prediction()
 
@@ -363,6 +356,6 @@ run_m <- function() {
   )
 }
 
-# run_w()
+run_w()
 run_m()
 
