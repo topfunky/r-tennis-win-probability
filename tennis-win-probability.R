@@ -270,7 +270,7 @@ plot_accuracy <-
       # Calculate the calibration results:
       summarize(
         n_plays = n(),
-        n_wins = length(which(Player1Wins == 1)),
+        n_wins = sum(Player1Wins),
         bin_actual_prob = n_wins / n_plays
       )
 
