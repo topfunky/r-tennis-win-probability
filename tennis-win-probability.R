@@ -232,6 +232,61 @@ load_and_clean_data <- function() {
   return(pbp)
 }
 
+plot_accuracy <-
+  function(data, foreground_color, background_color) {
+    data <- data %>%
+      mutate(bin_pred_prob = round(win_probability_player_1 / 0.02) * 0.02) %>%
+      group_by(bin_pred_prob) %>%
+      # Calculate the calibration results:
+      summarize(
+        n_plays = n(),
+        n_wins = length(which(match_winner_is_player_1 == 1)),
+        bin_actual_prob = n_wins / n_plays
+      )
+
+    plot <- data %>%
+      # ungroup() %>%
+      # mutate(qtr = fct_recode(
+      #   factor(qtr),
+      #   "Q1" = "1",
+      #   "Q2" = "2",
+      #   "Q3" = "3",
+      #   "Q4" = "4"
+      # )) %>%
+      ggplot() +
+      geom_point(aes(
+        x = bin_pred_prob,
+        y = bin_actual_prob,
+        size = n_plays
+      ), color = yellowgreen_neon) +
+      geom_smooth(aes(x = bin_pred_prob, y = bin_actual_prob),
+                  color = foreground_color,
+                  method = "loess") +
+      geom_abline(
+        slope = 1,
+        intercept = 0,
+        color = foreground_color,
+        lty = 2 # dashed
+      ) +
+      scale_x_continuous(labels = percent, limits = c(0, 1)) +
+      scale_y_continuous(labels = percent, limits = c(0, 1)) +
+      theme_high_contrast(
+        base_family = "InputMono",
+        background_color = background_color,
+        foreground_color = foreground_color
+      ) +
+      theme(legend.position = "none") +
+      labs(
+        title = "Model Accuracy",
+        subtitle = "Custom prediction vs actual win percentage",
+        caption = "Data from Match Charting Project",
+        x = "Predicted",
+        y = "Actual"
+      )
+    # TODO: facet_wrap
+  }
+
+
 run <- function() {
   match_ids <- list(
     "20190928-W-Wuhan-F-Aryna_Sabalenka-Alison_Riske",
@@ -247,6 +302,9 @@ run <- function() {
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id)
   }
+
+  plot <- plot_accuracy(pbp, light_grey, "#222222")
+  ggsave("out/accuracy.png", plot=plot, width=6, height=4)
 
   # For debugging...create a frame with just this match
   single_match_pbp <-
