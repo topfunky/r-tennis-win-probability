@@ -315,7 +315,7 @@ run_w <- function() {
 
   plot <- plot_accuracy(pbp, light_grey, "#222222")
   ggsave(
-    "out/accuracy_w.png",
+    "out/accuracy-w.png",
     plot = plot,
     width = 6,
     height = 4
