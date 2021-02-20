@@ -33,6 +33,6 @@ Data cleanup tasks to do:
 - Records are numbered by point `Pts` (approximately 100 per match)
 - `Set1` and `Set2` are sets won by player 1 or two
 - Same for `Gm1` and `Gm2`
-- `Pts` needs to be split on `-` to find points for each player
-- Could extend the model for points (currently uses games and sets)
+- The model uses points, games, and sets
+- The identity of the player serving the ball is not currently included in the model
 - Need to add reference lines for games or sets.
