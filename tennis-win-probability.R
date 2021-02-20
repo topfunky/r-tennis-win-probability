@@ -29,6 +29,12 @@ if (!dir.exists("data")) {
 if (!dir.exists("out")) {
   dir.create("out")
 }
+if (!dir.exists("out/w")) {
+  dir.create("out/w")
+}
+if (!dir.exists("out/m")) {
+  dir.create("out/m")
+}
 
 # Point by point records for women's matches.
 #
@@ -42,6 +48,15 @@ charting_w_points <- function() {
 charting_w_matches <- function() {
   retrieve_csv_and_cache_data_locally(
     "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-w-matches.csv"
+  )
+}
+
+# Point by point records for men's matches.
+#
+# Caches remote file if missing from local filesystem. Returns data frames.
+charting_m_points <- function() {
+  retrieve_csv_and_cache_data_locally(
+    "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-m-points.csv"
   )
 }
 
@@ -111,7 +126,7 @@ plot_for_data <-
         title = str_interp(
           "${this_match$player1} vs ${this_match$player2} @ ${this_match$tournament} ${this_match$date}"
         ),
-        subtitle = "Custom win probability model for women's tennis",
+        subtitle = "Custom win probability model for tennis",
         caption = "Data from https://github.com/JeffSackmann/tennis_MatchChartingProject",
         x = "Plays",
         y = "Win Probability"
@@ -145,22 +160,22 @@ populate_each_row_with_prediction <- function(pbp) {
 }
 
 
-plot_for_match_id <- function(data, single_match_id) {
+plot_for_match_id <- function(data, single_match_id, prefix) {
   single_match_records <- data %>% filter(match_id == single_match_id)
 
   plot <- plot_for_data(single_match_records,
                         "white",
                         dayglo_orange)
   ggsave(
-    str_interp("out/${single_match_id}.png"),
+    str_interp("out/${prefix}/${single_match_id}.png"),
     plot = plot,
     width = 8,
     height = 4
   )
 }
 
-load_and_clean_data <- function() {
-  pbp <- charting_w_points() %>%
+load_and_clean_data <- function(data) {
+  pbp <- data %>%
     # Fix problematic encoding on some rows
     mutate(match_id = iconv(match_id, "ASCII", "UTF-8")) %>%
     # The `separate` function splits a string like "20200823-A-B-C" on dashes.
@@ -305,12 +320,12 @@ run_w <- function() {
     "20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams"
   )
 
-  pbp <- load_and_clean_data() %>%
+  pbp <- load_and_clean_data(charting_w_points()) %>%
     filter(date > as.Date("2008-01-01")) %>%
     populate_each_row_with_prediction()
 
   for (single_match_id in match_ids) {
-    plot_for_match_id(pbp, single_match_id)
+    plot_for_match_id(pbp, single_match_id, "w")
   }
 
   plot <- plot_accuracy(pbp, light_grey, "#222222")
@@ -320,23 +335,34 @@ run_w <- function() {
     width = 6,
     height = 4
   )
-
-  # For debugging...create a frame with just this match
-  single_match_pbp <-
-    pbp %>%
-    filter(match_id == single_match_id) %>%
-    select(
-      match_id,
-      Pt,
-      Set1,
-      Set2,
-      Gm1,
-      Gm2,
-      Pts,
-      Svr,
-      match_winner_is_player_1,
-      win_probability_player_1
-    )
 }
 
-run_w()
+
+run_m <- function() {
+  match_ids <- list(
+    "20210212-M-Australian_Open-R32-Andrey_Rublev-Feliciano_Lopez",
+    "20080811-M-Los_Angeles-F-Andy_Roddick-Juan_Martin_Del_Potro",
+    "20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic",
+    "20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal"
+  )
+
+  pbp <- load_and_clean_data(charting_m_points()) %>%
+    filter(date > as.Date("2008-01-01")) %>%
+    populate_each_row_with_prediction()
+
+  for (single_match_id in match_ids) {
+    plot_for_match_id(pbp, single_match_id, "m")
+  }
+
+  plot <- plot_accuracy(pbp, light_grey, "#222222")
+  ggsave(
+    "out/accuracy-m.png",
+    plot = plot,
+    width = 6,
+    height = 4
+  )
+}
+
+# run_w()
+run_m()
+

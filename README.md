@@ -4,14 +4,23 @@ An experiment in building an in-game win probability model for tennis matches.
 
 ## Sample match
 
-- 20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png
 - http://www.tennisabstract.com/charting/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.html
 
-![Venus v Sabrina](out/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png)
+![Venus v Sabrina](out/w/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png)
+
+- http://www.tennisabstract.com/charting/20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic.html
+
+![Federer v Djokovic](out/m/20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic.png)
 
 ## Accuracy
 
-![Accuracy](out/accuracy-w.png)
+Women's model
+
+![Accuracy Women](out/accuracy-w.png)
+
+Men's model
+
+![Accuracy Men](out/accuracy-m.png)
 
 ## Reference
 
