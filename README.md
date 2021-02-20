@@ -11,7 +11,7 @@ An experiment in building an in-game win probability model for tennis matches.
 
 ## Accuracy
 
-![Accuracy](out/accuracy.png)
+![Accuracy](out/accuracy-w.png)
 
 ## Reference
 
