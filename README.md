@@ -4,13 +4,14 @@ An experiment in building an in-game win probability model for tennis matches.
 
 ## Sample match
 
-- http://www.tennisabstract.com/charting/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.html
+- [Point by point](http://www.tennisabstract.com/charting/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.html)
 
 ![Venus v Sabrina](out/w/20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams.png)
 
-- http://www.tennisabstract.com/charting/20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic.html
+- [Point by point](http://www.tennisabstract.com/charting/20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal.html)
+- [Video highlights](https://www.youtube.com/watch?v=QKlXGgbwwJI)
 
-![Federer v Djokovic](out/m/20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic.png)
+![Federer v Nadal](out/m/20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal.png)
 
 ## Accuracy
 
@@ -35,4 +36,4 @@ Data cleanup tasks to do:
 - Same for `Gm1` and `Gm2`
 - The model uses points, games, and sets
 - The identity of the player serving the ball is not currently included in the model
-- Need to add reference lines for games or sets.
+- Add estimated points (EPA) for potentially even greater accuracy
