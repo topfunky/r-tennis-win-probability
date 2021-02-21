@@ -62,7 +62,7 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes,]
+  train <- data[indexes, ]
 
   win_prediction_model = glm(
     Player1Wins ~
@@ -79,7 +79,7 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
+             predict(win_prediction_model, pbp[row_number(),], type = "response"))
   return(pbp)
 }
 
@@ -106,7 +106,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1, ]
+    this_match <- data[1,]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -212,7 +212,7 @@ plot_accuracy <-
         x = "Predicted",
         y = "Actual"
       ) +
-      facet_wrap( ~ SetCount, nrow = 2)
+      facet_wrap(~ SetCount, nrow = 2)
   }
 
 # Either process the data, write a cached version, and return it,
@@ -283,7 +283,7 @@ clean_data <- function(data) {
       Player1 = str_replace_all(Player1, "_", " "),
       Player2 = str_replace_all(Player2, "_", " "),
       Tournament = str_replace_all(Tournament, "_", " "),
-      Player1IsServing = ifelse(Svr == 1, 1, 0)
+      Player1IsServing = (Svr == 1)
     )
 
   # Get final play to determine match winner
@@ -292,7 +292,7 @@ clean_data <- function(data) {
     group_by(match_id) %>%
     filter(Pt == max(Pt)) %>%
     mutate(
-      Player1Wins = ifelse(PtWinner == 1, 1, 0),
+      Player1Wins = (PtWinner == 1),
       Pt = Pt + 1,
       PtTotal = Pt
     ) %>%
