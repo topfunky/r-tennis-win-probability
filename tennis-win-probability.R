@@ -73,6 +73,13 @@ plot_for_data <-
                  color = foreground_color,
                  size = 1) +
 
+      geom_vline(
+        data = data %>% filter(IsStartOfSet),
+        aes(xintercept = Pt),
+        color = foreground_color,
+        size = 0.25
+      ) +
+
       # Win Probability
       geom_line(size = 0.8) +
 
@@ -163,12 +170,16 @@ plot_for_match_id <- function(data, single_match_id, prefix) {
 # or just return the cached version from disk for quicker processing.
 load_and_clean_data <- function(data, gender) {
   local_data_cache_filename <- str_interp("data/${gender}.rds")
-  # Don't use cache if in development mode
-  if (!DEVELOPMENT_MODE | !file.exists(local_data_cache_filename)) {
+  if (DEVELOPMENT_MODE) {
+    # Always recalculate if in development mode
+    return(clean_data(data))
+  } else if (!file.exists(local_data_cache_filename)) {
+    # Recalculate and save to disk
     cleaned_data <- clean_data(data)
     write_rds(cleaned_data, local_data_cache_filename)
     return(cleaned_data)
   } else {
+    # Use cache
     cleaned_data <- readRDS(local_data_cache_filename)
     return(cleaned_data)
   }
@@ -286,7 +297,9 @@ clean_data <- function(data) {
   pbp <- pbp %>% mutate(
     SetDelta = Set1 - Set2,
     GmDelta = Gm1 - Gm2,
-    PtCountdown = PtTotal - Pt
+    PtCountdown = PtTotal - Pt,
+    IsStartOfSet = (Pt < PtTotal & (Set1 > lag(Set1) |
+                                      Set2 > lag(Set2)))
   )
 
   return(pbp)
@@ -380,11 +393,13 @@ run_m <- function() {
     "20210212-M-Australian_Open-R32-Andrey_Rublev-Feliciano_Lopez",
     "20080811-M-Los_Angeles-F-Andy_Roddick-Juan_Martin_Del_Potro",
     "20200130-M-Australian_Open-SF-Roger_Federer-Novak_Djokovic",
-    "20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal"
+    "20050403-M-Miami_Masters-F-Roger_Federer-Rafael_Nadal",
+    "20180905-M-US_Open-QF-Rafael_Nadal-Dominic_Thiem",
+    "20190704-M-Wimbledon-R64-Rafael_Nadal-Nick_Kyrgios"
   )
 
   pbp <- load_and_clean_data(charting_points("m"), "m") %>%
-    filter(MatchDate > as.Date("2008-01-01")) %>%
+    filter(MatchDate > as.Date("2005-01-01")) %>%
     populate_each_row_with_prediction()
 
   for (single_match_id in match_ids) {
