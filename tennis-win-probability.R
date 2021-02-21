@@ -4,10 +4,8 @@
 library(nflfastR)
 library(tidyverse)
 library(gghighcontrast)
-library(scales)
-library(ggimage)
 
-DEVELOPMENT_MODE = TRUE
+DEVELOPMENT_MODE = FALSE
 
 # Don't display numbers in scientific notation
 options(scipen = 9999)
@@ -64,7 +62,7 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes, ]
+  train <- data[indexes,]
 
   win_prediction_model = glm(
     Player1Wins ~
@@ -81,7 +79,7 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(),], type = "response"))
+             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
   return(pbp)
 }
 
@@ -108,7 +106,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1,]
+    this_match <- data[1, ]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -161,7 +159,7 @@ plot_for_data <-
           "${this_match$Player1} vs ${this_match$Player2} @ ${this_match$Tournament} ${this_match$MatchDate}"
         ),
         subtitle = "Custom win probability model for tennis",
-        caption = "Data from https://github.com/JeffSackmann/tennis_MatchChartingProject",
+        caption = "Model: topfunky.com • Data: The Match Charting Project",
         x = "Plays",
         y = "Win Probability"
       )
@@ -173,24 +171,18 @@ plot_accuracy <-
            foreground_color,
            background_color) {
     data <- data %>%
+      filter(!is.na(SetCount)) %>%
       mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
-      group_by(bin_pred_prob) %>%
+      group_by(SetCount, bin_pred_prob) %>%
       # Calculate the calibration results:
       summarize(
         n_plays = n(),
         n_wins = sum(Player1Wins),
         bin_actual_prob = n_wins / n_plays
-      )
+      ) %>%
+      ungroup()
 
     plot <- data %>%
-      # ungroup() %>%
-      # mutate(qtr = fct_recode(
-      #   factor(qtr),
-      #   "Q1" = "1",
-      #   "Q2" = "2",
-      #   "Q3" = "3",
-      #   "Q4" = "4"
-      # )) %>%
       ggplot() +
       geom_point(aes(x = bin_pred_prob,
                      y = bin_actual_prob,
@@ -214,13 +206,13 @@ plot_accuracy <-
       ) +
       theme(legend.position = "none") +
       labs(
-        title = str_interp("Model Accuracy ${gender}"),
+        title = str_interp("Model Accuracy by Set: ${gender}"),
         subtitle = "Model prediction vs actual win percentage",
-        caption = "Data from Match Charting Project",
+        caption = "Model: topfunky.com • Data: The Match Charting Project",
         x = "Predicted",
         y = "Actual"
-      )
-    # TODO: facet_wrap
+      ) +
+      facet_wrap( ~ SetCount, nrow = 2)
   }
 
 # Either process the data, write a cached version, and return it,
@@ -351,19 +343,20 @@ clean_data <- function(data) {
   pbp <- bind_rows(pbp, match_result_plays)
 
   # Calculate delta for Sets, Games, Pt (number of plays)
-  pbp <- pbp %>% mutate(
-    SetDelta = Set1 - Set2,
-    GmDelta = Gm1 - Gm2,
-    PtCountdown = PtTotal - Pt,
-    IsStartOfSet = (Pt < PtTotal & (Set1 > lag(Set1) |
-                                      Set2 > lag(Set2)))
-  )
+  pbp <- pbp %>%
+    mutate(
+      SetDelta = Set1 - Set2,
+      GmDelta = Gm1 - Gm2,
+      PtCountdown = PtTotal - Pt,
+      IsStartOfSet = (Pt < PtTotal & (Set1 > lag(Set1) |
+                                        Set2 > lag(Set2))),
+      # Calculate set but index from 1 (first set played is Set 1)
+      SetCount = ifelse(Pt < PtTotal, Set1 + Set2 + 1, NA)
+    ) %>%
+    arrange(match_id, Pt)
 
   return(pbp)
 }
-
-
-
 
 run_w <- function() {
   match_ids <- list(
@@ -374,14 +367,14 @@ run_w <- function() {
   )
 
   pbp <- load_and_clean_data(charting_points("w"), "w") %>%
-    filter(MatchDate > as.Date("2008-01-01")) %>%
+    filter(MatchDate > as.Date("2005-01-01")) %>%
     populate_each_row_with_prediction()
 
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id, "w")
   }
 
-  plot <- plot_accuracy(pbp, "w", light_grey, "#222222")
+  plot <- plot_accuracy(pbp, "Women", light_grey, "#222222")
   ggsave(
     "out/accuracy-w.png",
     plot = plot,
@@ -409,7 +402,7 @@ run_m <- function() {
     plot_for_match_id(pbp, single_match_id, "m")
   }
 
-  plot <- plot_accuracy(pbp, "m", light_grey, "#222222")
+  plot <- plot_accuracy(pbp, "Men", light_grey, "#222222")
   ggsave(
     "out/accuracy-m.png",
     plot = plot,
