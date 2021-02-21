@@ -57,6 +57,50 @@ retrieve_csv_and_cache_data_locally <- function(url) {
   return(data)
 }
 
+
+build_win_prediction_model <- function(data) {
+  set.seed(525)
+  # Sample 80% of rows
+  indexes = sample(1:nrow(data),
+                   round(nrow(data) * 0.8),
+                   replace = FALSE)
+  train <- data[indexes, ]
+
+  win_prediction_model = glm(
+    Player1Wins ~
+      SetDelta + GmDelta + Pts1Delta + PtCountdown + Player1IsServing,
+    train,
+    family = "binomial"
+  )
+  return(win_prediction_model)
+}
+
+
+populate_each_row_with_prediction <- function(pbp) {
+  win_prediction_model <- build_win_prediction_model(pbp)
+
+  pbp <- pbp %>%
+    mutate(win_probability_player_1 =
+             predict(win_prediction_model, pbp[row_number(),], type = "response"))
+  return(pbp)
+}
+
+
+plot_for_match_id <- function(data, single_match_id, prefix) {
+  single_match_records <- data %>% filter(match_id == single_match_id)
+
+  plot <- plot_for_data(single_match_records,
+                        "white",
+                        dayglo_orange)
+  ggsave(
+    str_interp("out/${prefix}/${single_match_id}.png"),
+    plot = plot,
+    width = 8,
+    height = 4
+  )
+}
+
+
 # Plot a single match.
 #
 # Returns the plot which can be saved to disk or displayed otherwise.
@@ -64,7 +108,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1, ]
+    this_match <- data[1,]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -123,48 +167,61 @@ plot_for_data <-
       )
   }
 
+plot_accuracy <-
+  function(data,
+           gender,
+           foreground_color,
+           background_color) {
+    data <- data %>%
+      mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
+      group_by(bin_pred_prob) %>%
+      # Calculate the calibration results:
+      summarize(
+        n_plays = n(),
+        n_wins = sum(Player1Wins),
+        bin_actual_prob = n_wins / n_plays
+      )
 
-build_win_prediction_model <- function(data) {
-  set.seed(525)
-  # Sample 80% of rows
-  indexes = sample(1:nrow(data),
-                   round(nrow(data) * 0.8),
-                   replace = FALSE)
-  train <- data[indexes,]
-
-  win_prediction_model = glm(
-    Player1Wins ~
-      SetDelta + GmDelta + Pts1Delta + PtCountdown + Player1IsServing,
-    train,
-    family = "binomial"
-  )
-  return(win_prediction_model)
-}
-
-
-populate_each_row_with_prediction <- function(pbp) {
-  win_prediction_model <- build_win_prediction_model(pbp)
-
-  pbp <- pbp %>%
-    mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(), ], type = "response"))
-  return(pbp)
-}
-
-
-plot_for_match_id <- function(data, single_match_id, prefix) {
-  single_match_records <- data %>% filter(match_id == single_match_id)
-
-  plot <- plot_for_data(single_match_records,
-                        "white",
-                        dayglo_orange)
-  ggsave(
-    str_interp("out/${prefix}/${single_match_id}.png"),
-    plot = plot,
-    width = 8,
-    height = 4
-  )
-}
+    plot <- data %>%
+      # ungroup() %>%
+      # mutate(qtr = fct_recode(
+      #   factor(qtr),
+      #   "Q1" = "1",
+      #   "Q2" = "2",
+      #   "Q3" = "3",
+      #   "Q4" = "4"
+      # )) %>%
+      ggplot() +
+      geom_point(aes(x = bin_pred_prob,
+                     y = bin_actual_prob,
+                     size = n_plays),
+                 color = yellowgreen_neon) +
+      geom_smooth(aes(x = bin_pred_prob, y = bin_actual_prob),
+                  color = foreground_color,
+                  method = "loess") +
+      geom_abline(
+        slope = 1,
+        intercept = 0,
+        color = foreground_color,
+        lty = 2 # dashed
+      ) +
+      scale_x_continuous(labels = percent, limits = c(0, 1)) +
+      scale_y_continuous(labels = percent, limits = c(0, 1)) +
+      theme_high_contrast(
+        base_family = "InputMono",
+        background_color = background_color,
+        foreground_color = foreground_color
+      ) +
+      theme(legend.position = "none") +
+      labs(
+        title = str_interp("Model Accuracy ${gender}"),
+        subtitle = "Model prediction vs actual win percentage",
+        caption = "Data from Match Charting Project",
+        x = "Predicted",
+        y = "Actual"
+      )
+    # TODO: facet_wrap
+  }
 
 # Either process the data, write a cached version, and return it,
 # or just return the cached version from disk for quicker processing.
@@ -305,61 +362,7 @@ clean_data <- function(data) {
   return(pbp)
 }
 
-plot_accuracy <-
-  function(data,
-           gender,
-           foreground_color,
-           background_color) {
-    data <- data %>%
-      mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
-      group_by(bin_pred_prob) %>%
-      # Calculate the calibration results:
-      summarize(
-        n_plays = n(),
-        n_wins = sum(Player1Wins),
-        bin_actual_prob = n_wins / n_plays
-      )
 
-    plot <- data %>%
-      # ungroup() %>%
-      # mutate(qtr = fct_recode(
-      #   factor(qtr),
-      #   "Q1" = "1",
-      #   "Q2" = "2",
-      #   "Q3" = "3",
-      #   "Q4" = "4"
-      # )) %>%
-      ggplot() +
-      geom_point(aes(x = bin_pred_prob,
-                     y = bin_actual_prob,
-                     size = n_plays),
-                 color = yellowgreen_neon) +
-      geom_smooth(aes(x = bin_pred_prob, y = bin_actual_prob),
-                  color = foreground_color,
-                  method = "loess") +
-      geom_abline(
-        slope = 1,
-        intercept = 0,
-        color = foreground_color,
-        lty = 2 # dashed
-      ) +
-      scale_x_continuous(labels = percent, limits = c(0, 1)) +
-      scale_y_continuous(labels = percent, limits = c(0, 1)) +
-      theme_high_contrast(
-        base_family = "InputMono",
-        background_color = background_color,
-        foreground_color = foreground_color
-      ) +
-      theme(legend.position = "none") +
-      labs(
-        title = str_interp("Model Accuracy ${gender}"),
-        subtitle = "Model prediction vs actual win percentage",
-        caption = "Data from Match Charting Project",
-        x = "Predicted",
-        y = "Actual"
-      )
-    # TODO: facet_wrap
-  }
 
 
 run_w <- function() {
