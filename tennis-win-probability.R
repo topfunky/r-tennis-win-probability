@@ -4,6 +4,7 @@
 library(nflfastR)
 library(tidyverse)
 library(gghighcontrast)
+library(scales)
 
 DEVELOPMENT_MODE = FALSE
 

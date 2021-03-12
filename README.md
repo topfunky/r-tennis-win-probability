@@ -29,6 +29,12 @@ Data is from the [Match Charting Project](https://github.com/JeffSackmann/tennis
 
 ## Development notes
 
+Run on the command line:
+
+```shell
+$ R < tennis-win-probability.R --no-save
+```
+
 Data cleanup tasks to do:
 
 - Records are numbered by point `Pts` (approximately 100 per match)
