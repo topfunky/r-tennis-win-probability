@@ -11,6 +11,16 @@ library(caTools)
 library(dplyr)
 library(caret)
 
+library(future)
+library(future.apply)
+future.seed=TRUE
+is_running_in_r_studio <- Sys.getenv("RSTUDIO") == "1"
+if (is_running_in_r_studio) {
+  plan(multisession)
+} else {
+  plan(multicore)
+}
+
 DEVELOPMENT_MODE = FALSE
 
 # Don't display numbers in scientific notation
@@ -68,7 +78,7 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes, ]
+  train <- data[indexes,]
 
   y = as.numeric(train$Player1Wins)
   x = train %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
@@ -79,7 +89,8 @@ build_win_prediction_model <- function(data) {
     list(
       booster = "gbtree",
       objective = "binary:logistic",
-      nthread = -1, # default: use as many cores as possible
+      nthread = -1,
+      # default: use as many cores as possible
       eta = 0.3,
       gamma = 0,
       max_depth = 6,
@@ -91,7 +102,7 @@ build_win_prediction_model <- function(data) {
   win_prediction_model <- xgb.train(
     params = xgb_params,
     data = xgb_train,
-    nrounds = 5000,
+    nrounds = 3000,
     verbose = 1
   )
 
@@ -102,11 +113,13 @@ build_win_prediction_model <- function(data) {
 populate_each_row_with_prediction <- function(pbp) {
   win_prediction_model <- build_win_prediction_model(pbp)
 
-  pbp <- pbp %>%
+  pbp %<-% {
+    pbp %>%
     mutate(win_probability_player_1 =
              predict(win_prediction_model, as.matrix(
-               pbp[row_number(),] %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
-             ), reshape=TRUE))
+               pbp[row_number(), ] %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
+             ), reshape = TRUE))
+  }
   return(pbp)
 }
 
@@ -133,7 +146,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1,]
+    this_match <- data[1, ]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -239,7 +252,7 @@ plot_accuracy <-
         x = "Predicted",
         y = "Actual"
       ) +
-      facet_wrap(~ SetCount, nrow = 2)
+      facet_wrap( ~ SetCount, nrow = 2)
   }
 
 # Either process the data, write a cached version, and return it,
@@ -438,5 +451,11 @@ run_m <- function() {
   )
 }
 
-run_w()
-run_m()
+# run_w()
+# run_m()
+
+# Run in parallel
+functions <- list(run_w, run_m)
+future_lapply(functions, function(x) {
+  x()
+})
