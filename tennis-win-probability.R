@@ -6,6 +6,11 @@ library(tidyverse)
 library(gghighcontrast)
 library(scales)
 
+library(xgboost)
+library(caTools)
+library(dplyr)
+library(caret)
+
 DEVELOPMENT_MODE = FALSE
 
 # Don't display numbers in scientific notation
@@ -65,12 +70,31 @@ build_win_prediction_model <- function(data) {
                    replace = FALSE)
   train <- data[indexes, ]
 
-  win_prediction_model = glm(
-    Player1Wins ~
-      SetDelta + GmDelta + Pts1Delta + PtCountdown + Player1IsServing,
-    train,
-    family = "binomial"
+  y = as.numeric(train$Player1Wins)
+  x = train %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
+
+  xgb_train <- xgb.DMatrix(data = as.matrix(x), label = y)
+
+  xgb_params <-
+    list(
+      booster = "gbtree",
+      objective = "binary:logistic",
+      nthread = 3,
+      eta = 0.3,
+      gamma = 0,
+      max_depth = 6,
+      min_child_weight = 1,
+      subsample = 1,
+      colsample_bytree = 1
+    )
+
+  win_prediction_model <- xgb.train(
+    params = xgb_params,
+    data = xgb_train,
+    nrounds = 2500,
+    verbose = 1
   )
+
   return(win_prediction_model)
 }
 
@@ -80,7 +104,9 @@ populate_each_row_with_prediction <- function(pbp) {
 
   pbp <- pbp %>%
     mutate(win_probability_player_1 =
-             predict(win_prediction_model, pbp[row_number(),], type = "response"))
+             predict(win_prediction_model, as.matrix(
+               pbp[row_number(),] %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
+             ), reshape=TRUE))
   return(pbp)
 }
 
@@ -284,7 +310,7 @@ clean_data <- function(data) {
       Player1 = str_replace_all(Player1, "_", " "),
       Player2 = str_replace_all(Player2, "_", " "),
       Tournament = str_replace_all(Tournament, "_", " "),
-      Player1IsServing = (Svr == 1)
+      Player1IsServing = as.numeric(Svr == 1)
     )
 
   # Get final play to determine match winner
@@ -293,7 +319,7 @@ clean_data <- function(data) {
     group_by(match_id) %>%
     filter(Pt == max(Pt)) %>%
     mutate(
-      Player1Wins = (PtWinner == 1),
+      Player1Wins = as.numeric(PtWinner == 1),
       Pt = Pt + 1,
       PtTotal = Pt
     ) %>%
