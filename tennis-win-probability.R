@@ -79,7 +79,7 @@ build_win_prediction_model <- function(data) {
     list(
       booster = "gbtree",
       objective = "binary:logistic",
-      nthread = 3,
+      nthread = -1, # default: use as many cores as possible
       eta = 0.3,
       gamma = 0,
       max_depth = 6,
@@ -91,7 +91,7 @@ build_win_prediction_model <- function(data) {
   win_prediction_model <- xgb.train(
     params = xgb_params,
     data = xgb_train,
-    nrounds = 2500,
+    nrounds = 5000,
     verbose = 1
   )
 
