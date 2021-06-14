@@ -1,6 +1,6 @@
 # Tennis In-Game Win Probability with R
 
-An experiment in building an in-game win probability model for tennis matches.
+An experiment in building an in-game win probability model for tennis matches. Uses [XGBoost](https://xgboost.ai).
 
 ## Sample match
 
@@ -17,11 +17,21 @@ An experiment in building an in-game win probability model for tennis matches.
 
 Women's model
 
-![Accuracy Women](out/accuracy-w.png)
+![Accuracy Women](out/w/accuracy.png)
 
 Men's model
 
-![Accuracy Men](out/accuracy-m.png)
+![Accuracy Men](out/m/accuracy.png)
+
+## Feature Importance
+
+Women's model
+
+![Feature Importance Women](out/w/importance.png)
+
+Men's model
+
+![Feature Importance Men](out/m/importance.png)
 
 ## Reference
 
@@ -32,7 +42,7 @@ Data is from the [Match Charting Project](https://github.com/JeffSackmann/tennis
 Run on the command line:
 
 ```shell
-$ R < tennis-win-probability.R --no-save
+$ R --no-save < tennis-win-probability.R
 ```
 
 Data cleanup tasks to do:

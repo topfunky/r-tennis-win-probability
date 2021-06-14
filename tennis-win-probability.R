@@ -1,5 +1,5 @@
 # Load libraries
-# install.packages("nflfastR", "ggimage", "devtools")
+# install.packages("devtools")
 # devtools::install_github("topfunky/gghighcontrast")
 library(nflfastR)
 library(tidyverse)
@@ -11,15 +11,18 @@ library(caTools)
 library(dplyr)
 library(caret)
 
+library(Ckmeans.1d.dp)
+
 library(future)
 library(future.apply)
-future.seed=TRUE
+
 is_running_in_r_studio <- Sys.getenv("RSTUDIO") == "1"
 if (is_running_in_r_studio) {
   plan(multisession)
 } else {
   plan(multicore)
 }
+future.seed = TRUE
 
 DEVELOPMENT_MODE = FALSE
 
@@ -78,10 +81,10 @@ build_win_prediction_model <- function(data) {
   indexes = sample(1:nrow(data),
                    round(nrow(data) * 0.8),
                    replace = FALSE)
-  train <- data[indexes,]
+  train <- data[indexes, ]
 
   y = as.numeric(train$Player1Wins)
-  x = train %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
+  x = train |> select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
 
   xgb_train <- xgb.DMatrix(data = as.matrix(x), label = y)
 
@@ -102,30 +105,52 @@ build_win_prediction_model <- function(data) {
   win_prediction_model <- xgb.train(
     params = xgb_params,
     data = xgb_train,
-    nrounds = 3000,
+    nrounds = 30,
     verbose = 1
   )
 
   return(win_prediction_model)
 }
 
+render_importance_chart <- function(model, gender) {
+  # Importance
+  importance <- xgboost::xgb.importance(feature_names = colnames(model),
+                                        model = model)
 
-populate_each_row_with_prediction <- function(pbp) {
+  importance_plot = xgboost::xgb.ggplot.importance(importance_matrix = importance) +
+    theme_high_contrast(base_family = "InputMono")
+  ggsave(
+    str_interp("out/${gender}/importance.png"),
+    plot = importance_plot,
+    width = 6,
+    height = 4
+  )
+}
+
+populate_each_row_with_prediction <- function(pbp, gender) {
   win_prediction_model <- build_win_prediction_model(pbp)
 
+  render_importance_chart(win_prediction_model, gender)
+
   pbp %<-% {
-    pbp %>%
-    mutate(win_probability_player_1 =
-             predict(win_prediction_model, as.matrix(
-               pbp[row_number(), ] %>% select(SetDelta, GmDelta, Pts1Delta, PtCountdown, Player1IsServing)
-             ), reshape = TRUE))
+    pbp |>
+      mutate(win_probability_player_1 =
+               predict(win_prediction_model, as.matrix(
+                 pbp[row_number(),] |> select(
+                   SetDelta,
+                   GmDelta,
+                   Pts1Delta,
+                   PtCountdown,
+                   Player1IsServing
+                 )
+               ), reshape = TRUE))
   }
   return(pbp)
 }
 
 
 plot_for_match_id <- function(data, single_match_id, prefix) {
-  single_match_records <- data %>% filter(match_id == single_match_id)
+  single_match_records <- data |> filter(match_id == single_match_id)
 
   plot <- plot_for_data(single_match_records,
                         "white",
@@ -146,7 +171,7 @@ plot_for_data <-
   function(data,
            foreground_color,
            background_color) {
-    this_match <- data[1, ]
+    this_match <- data[1,]
 
     plot <- ggplot(data,
                    aes(x = Pt, y = win_probability_player_1)) +
@@ -156,7 +181,7 @@ plot_for_data <-
                  size = 1) +
 
       geom_vline(
-        data = data %>% filter(IsStartOfSet),
+        data = data |> filter(IsStartOfSet),
         aes(xintercept = Pt),
         color = foreground_color,
         size = 0.25
@@ -210,19 +235,19 @@ plot_accuracy <-
            gender,
            foreground_color,
            background_color) {
-    data <- data %>%
-      filter(!is.na(SetCount)) %>%
-      mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) %>%
-      group_by(SetCount, bin_pred_prob) %>%
+    data <- data |>
+      filter(!is.na(SetCount)) |>
+      mutate(bin_pred_prob = round(win_probability_player_1 / 0.05) * 0.05) |>
+      group_by(SetCount, bin_pred_prob) |>
       # Calculate the calibration results:
       summarize(
         n_plays = n(),
         n_wins = sum(Player1Wins),
         bin_actual_prob = n_wins / n_plays
-      ) %>%
+      ) |>
       ungroup()
 
-    plot <- data %>%
+    plot <- data |>
       ggplot() +
       geom_point(aes(x = bin_pred_prob,
                      y = bin_actual_prob,
@@ -252,7 +277,7 @@ plot_accuracy <-
         x = "Predicted",
         y = "Actual"
       ) +
-      facet_wrap( ~ SetCount, nrow = 2)
+      facet_wrap(~ SetCount, nrow = 2)
   }
 
 # Either process the data, write a cached version, and return it,
@@ -294,9 +319,9 @@ convert_pts_to_integer <- function(v) {
 }
 
 clean_data <- function(data) {
-  pbp <- data %>%
+  pbp <- data |>
     # Fix problematic encoding on some rows
-    mutate(match_id = iconv(match_id, "ASCII", "UTF-8")) %>%
+    mutate(match_id = iconv(match_id, "ASCII", "UTF-8")) |>
     # The `separate` function splits a string like "20200823-A-B-C" on dashes.
     # Grab only the first piece as a new `date_string` column.
     separate(
@@ -311,8 +336,8 @@ clean_data <- function(data) {
       ),
       remove = FALSE,
       sep = "-"
-    ) %>%
-    separate(Pts, c("PtsA", "PtsB"), remove = FALSE, sep = "-") %>%
+    ) |>
+    separate(Pts, c("PtsA", "PtsB"), remove = FALSE, sep = "-") |>
     mutate(
       PtsA = convert_pts_to_integer(PtsA),
       PtsB = convert_pts_to_integer(PtsB),
@@ -328,28 +353,28 @@ clean_data <- function(data) {
 
   # Get final play to determine match winner
   final_play_for_each_match <-
-    pbp %>%
-    group_by(match_id) %>%
-    filter(Pt == max(Pt)) %>%
+    pbp |>
+    group_by(match_id) |>
+    filter(Pt == max(Pt)) |>
     mutate(
       Player1Wins = as.numeric(PtWinner == 1),
       Pt = Pt + 1,
       PtTotal = Pt
-    ) %>%
+    ) |>
     ungroup()
 
   # Select only a few fields
-  match_winners <- final_play_for_each_match %>%
+  match_winners <- final_play_for_each_match |>
     select(match_id, Player1Wins, PtTotal)
 
   # Join so all rows include the match winner
   pbp <-
-    pbp %>%
+    pbp |>
     inner_join(match_winners, by = "match_id")
 
   # Create rows for final outcome.
   # The point by point frames don't include the final score.
-  match_result_plays <- final_play_for_each_match %>%
+  match_result_plays <- final_play_for_each_match |>
     mutate(
       Set1 = ifelse(Player1Wins == 1, Set1 + 1, Set1),
       Set2 = ifelse(Player1Wins == 0, Set2 + 1, Set2),
@@ -358,7 +383,7 @@ clean_data <- function(data) {
       Pts = "0-0",
       Pts1Delta = 0,
       Pts2Delta = 0
-    ) %>%
+    ) |>
     select(
       match_id,
       Pt,
@@ -383,7 +408,7 @@ clean_data <- function(data) {
   pbp <- bind_rows(pbp, match_result_plays)
 
   # Calculate delta for Sets, Games, Pt (number of plays)
-  pbp <- pbp %>%
+  pbp <- pbp |>
     mutate(
       SetDelta = Set1 - Set2,
       GmDelta = Gm1 - Gm2,
@@ -392,7 +417,7 @@ clean_data <- function(data) {
                                         Set2 > lag(Set2))),
       # Calculate set but index from 1 (first set played is Set 1)
       SetCount = ifelse(Pt < PtTotal, Set1 + Set2 + 1, NA)
-    ) %>%
+    ) |>
     arrange(match_id, Pt)
 
   return(pbp)
@@ -406,9 +431,9 @@ run_w <- function() {
     "20080705-W-Wimbledon-F-Venus_Williams-Serena_Williams"
   )
 
-  pbp <- load_and_clean_data(charting_points("w"), "w") %>%
-    filter(MatchDate > as.Date("2005-01-01")) %>%
-    populate_each_row_with_prediction()
+  pbp <- load_and_clean_data(charting_points("w"), "w") |>
+    filter(MatchDate > as.Date("2005-01-01")) |>
+    populate_each_row_with_prediction("w")
 
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id, "w")
@@ -416,7 +441,7 @@ run_w <- function() {
 
   plot <- plot_accuracy(pbp, "Women", light_grey, "#222222")
   ggsave(
-    "out/accuracy-w.png",
+    "out/w/accuracy.png",
     plot = plot,
     width = 6,
     height = 4
@@ -434,9 +459,9 @@ run_m <- function() {
     "20190704-M-Wimbledon-R64-Rafael_Nadal-Nick_Kyrgios"
   )
 
-  pbp <- load_and_clean_data(charting_points("m"), "m") %>%
-    filter(MatchDate > as.Date("2005-01-01")) %>%
-    populate_each_row_with_prediction()
+  pbp <- load_and_clean_data(charting_points("m"), "m") |>
+    filter(MatchDate > as.Date("2005-01-01")) |>
+    populate_each_row_with_prediction("m")
 
   for (single_match_id in match_ids) {
     plot_for_match_id(pbp, single_match_id, "m")
@@ -444,11 +469,35 @@ run_m <- function() {
 
   plot <- plot_accuracy(pbp, "Men", light_grey, "#222222")
   ggsave(
-    "out/accuracy-m.png",
+    "out/m/accuracy.png",
     plot = plot,
     width = 6,
     height = 4
   )
+
+
+  # Decision tree experiment
+  require(rpart)
+  require(rpart.plot)
+  binary.model <-
+    rpart(Player1Wins ~ SetDelta + GmDelta + Pts1Delta + PtCountdown + Player1IsServing,
+          data = pbp)
+
+  png(
+    filename = "out/m/decision_tree_plot.png",
+    width = 2000,
+    height = 2000,
+    res = 216
+  )
+  decision_tree_plot = binary.model |> rpart.plot(
+    main = "Match Win Decision Tree",
+    roundint = FALSE,
+    cex = 0.8,
+    fallen.leaves = TRUE,
+    extra = 101
+  )
+  dev.off()
+
 }
 
 # run_w()
@@ -458,4 +507,5 @@ run_m <- function() {
 functions <- list(run_w, run_m)
 future_lapply(functions, function(x) {
   x()
-})
+}, future.seed = TRUE)
+
