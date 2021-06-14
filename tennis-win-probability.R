@@ -1,7 +1,6 @@
 # Load libraries
 # install.packages("devtools")
 # devtools::install_github("topfunky/gghighcontrast")
-library(nflfastR)
 library(tidyverse)
 library(gghighcontrast)
 library(scales)
